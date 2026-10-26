@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="BlackBox" />
+  <title>BlackBox Studio</title>
+  <style>
+    :root {
+      --bg: #18181B;
+      --surface: #232328;
+      --surface-elevated: #2E2E35;
+      --glass: rgba(35, 35, 40, 0.82);
+      --border: rgba(255, 255, 255, 0.09);
+      --border-strong: rgba(255, 255, 255, 0.22);
+      --white: #F4F4F6;
+      --white-muted: #D4D4D8;
+      --secondary: #A1A1AA;
+      --tertiary: #52525B;
+      --red: #F87171;
+      --green: #4ADE80;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-width: 500px;
+      margin: 0 auto;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: max(14px, env(safe-area-inset-bottom));
+      position: relative;
+    }
+
+    /* Top Functional Toolbar (Liquid Glass) */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      height: 54px;
+      z-index: 10;
+    }
+
+    .icon-btn {
+      width: 44px;
+      height: 44px; /* Strict 44x44pt Apple HIG touch target */
+      border-radius: 22px;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .status-dot {
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      width: 6px;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--secondary);
+    }
+    .status-dot.connected {
+      background: var(--green);
+    }
+
+    .timecode-pill {
+      padding: 6px 13px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1px;
+      color: var(--white-muted);
+      transition: all 0.2s;
+    }
+
+    .timecode-pill.invalid {
+      background: rgba(248, 113, 113, 0.16);
+      border-color: rgba(248, 113, 113, 0.45);
+      color: var(--red);
+    }
+
+    /* Prominent Primary Action (44pt Apple HIG Height) */
+    .send-btn {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 22px;
+      background: var(--white);
+      color: #121214;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .send-btn:active { transform: scale(0.97); }
+    .send-btn:disabled {
+      background: var(--surface);
+      color: var(--tertiary);
+      cursor: default;
+    }
+
+    /* Center Video Viewport (Transparent Centering Stage — No Extra Grey Box Around Horizontal Clips) */
+    .stage {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 6px 16px;
+    }
+
+    .empty-prompt {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      padding: 48px 32px;
+      text-align: center;
+      border-radius: 16px;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+    }
+
+    .plus-ring {
+      width: 60px;
+      height: 60px;
+      border-radius: 30px;
+      background: var(--surface-elevated);
+      border: 0.5px solid var(--border-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--white);
+    }
+
+    .empty-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+    }
+
+    .empty-sub {
+      font-size: 13px;
+      color: var(--secondary);
+      max-width: 245px;
+      line-height: 1.4;
+    }
+
+    /* Frame Wrapper: Tightly Fits Clip Aspect Ratio */
+    .video-frame {
+      position: relative;
+      width: 100%;
+      max-height: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000000;
+      border: 0.5px solid var(--border-strong);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Glanceable Automated Metadata Badge */
+    .meta-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: var(--glass);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 0.5px solid var(--border-strong);
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--white-muted);
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
+
+    /* Deliberate 44x44pt Play/Pause Button (Static by Default) */
+    .play-toggle-btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      background: var(--glass);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 0.5px solid var(--border-strong);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* Bottom Precision Deck */
+    .editor-deck {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      padding: 6px 16px 2px;
+    }
+
+    /* Swipe-Based Batch Carousel (No Exposed 'X' Buttons, 44pt Touch Height) */
+    .batch-strip-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .batch-scroll {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 2px 0;
+      align-items: center;
+    }
+    .batch-scroll::-webkit-scrollbar { display: none; }
+
+    .clip-card {
+      flex-shrink: 0;
+      min-width: 86px;
+      min-height: 44px; /* 44pt Apple HIG touch target */
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+    .clip-card.active {
+      background: var(--surface-elevated);
+      border-color: var(--white);
+    }
+    .clip-card.done {
+      border-color: rgba(74, 222, 128, 0.45);
+    }
+    .clip-card.invalid {
+      border-color: rgba(248, 113, 113, 0.45);
+    }
+
+    .clip-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--white-muted);
+    }
+    .clip-card.active .clip-card-top { color: var(--white); }
+    .clip-card.invalid .clip-card-top { color: var(--red); }
+
+    .clip-card-sub {
+      font-size: 11px; /* Minimum 11pt per Apple HIG typography.md */
+      color: var(--secondary);
+      margin-top: 2px;
+      text-transform: capitalize;
+    }
+
+    .add-clip-btn {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 0.5px solid var(--border-strong);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .sync-inline-btn {
+      flex-shrink: 0;
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 22px;
+      background: var(--surface);
+      border: 0.5px solid var(--border-strong);
+      color: var(--white);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sync-inline-btn:active {
+      background: var(--white);
+      color: #121214;
+    }
+
+    /* 1. Trim Scrubber Row (44pt Targets + Direct Touch Playhead & Handles + Split + Sync) */
+    .trim-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mini-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .mini-btn:active {
+      background: var(--surface-elevated);
+    }
+    .mini-btn.muted { color: var(--secondary); }
+
+    .trim-box {
+      flex: 1;
+      height: 44px;
+      background: var(--surface);
+      border-radius: 10px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border-strong);
+      overflow: hidden;
+      touch-action: none;
+      cursor: pointer;
+    }
+
+    .trim-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: rgba(244, 244, 246, 0.14);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .trim-handle {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      width: 12px;
+      border-radius: 4px;
+      background: var(--white);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.55);
+      pointer-events: none;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .trim-handle::after {
+      content: "";
+      width: 2px;
+      height: 14px;
+      border-radius: 1px;
+      background: #18181B;
+    }
+    .trim-handle.start {
+      transform: translateX(0);
+    }
+    .trim-handle.end {
+      transform: translateX(-100%);
+    }
+
+    /* Thin Movable Playhead Line */
+    .playhead-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--white);
+      pointer-events: none;
+      z-index: 4;
+      transform: translateX(-1px);
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.85);
+    }
+    .playhead-line::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: -4px;
+      width: 10px;
+      height: 10px;
+      border-radius: 5px;
+      background: var(--white);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+
+    /* 2. Stock Preset Strip OR Single Active Dial */
+    .active-dial {
+      height: 56px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .preset-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      align-items: center;
+    }
+    .preset-strip::-webkit-scrollbar { display: none; }
+
+    .preset-card {
+      flex-shrink: 0;
+      min-height: 48px;
+      padding: 6px 13px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .preset-card.active {
+      background: var(--surface-elevated);
+      border-color: var(--white);
+    }
+    .preset-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--white-muted);
+    }
+    .preset-card.active .preset-title { color: var(--white); }
+    .preset-sub {
+      font-size: 11px; /* Minimum 11pt per Apple HIG typography.md */
+      color: var(--secondary);
+      margin-top: 2px;
+    }
+
+    .dial-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+
+    .dial-name {
+      color: var(--secondary);
+      font-weight: 500;
+    }
+
+    .dial-val {
+      color: var(--white);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .dial-val.warn {
+      color: var(--red);
+    }
+
+    .apple-slider {
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface-elevated);
+      outline: none;
+    }
+    .apple-slider::-webkit-slider-thumb {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      background: var(--white);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+    }
+
+    /* 3. Parameter Selector Strip (44pt Touch Height) */
+    .param-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .param-pill {
+      flex: 1;
+      min-height: 44px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--secondary);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .param-pill.active {
+      background: var(--surface);
+      border-color: var(--border-strong);
+      color: var(--white);
+      font-weight: 600;
+    }
+    .param-pill.modified::after {
+      content: "";
+      width: 4px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--white);
+      position: absolute;
+      bottom: 5px;
+    }
+
+    /* Undo Snackbar & Determinate Progress Toast */
+    .toast, .undo-banner {
+      position: fixed;
+      bottom: 24px;
+      left: 20px;
+      right: 20px;
+      max-width: 460px;
+      margin: 0 auto;
+      background: var(--glass);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 0.5px solid var(--border-strong);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 40;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .undo-btn {
+      background: var(--white);
+      color: #121214;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Apple HIG Action Sheet for Safe Clip Deletion */
+    .action-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 60;
+      padding: 12px 12px max(24px, env(safe-area-inset-bottom));
+    }
+    .action-backdrop.open { display: flex; }
+
+    .action-sheet {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .action-group {
+      background: #252529;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .action-title {
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--secondary);
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    .action-row {
+      width: 100%;
+      min-height: 52px;
+      background: none;
+      border: none;
+      border-bottom: 0.5px solid var(--border);
+      color: var(--white);
+      font-size: 17px;
+      cursor: pointer;
+    }
+    .action-row:last-child { border-bottom: none; }
+    .action-row.destructive {
+      color: var(--red);
+      font-weight: 600;
+    }
+
+    .action-cancel {
+      width: 100%;
+      min-height: 52px;
+      background: #2C2C31;
+      border: none;
+      border-radius: 14px;
+      color: var(--white);
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Settings Half-Sheet */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 50;
+    }
+    .sheet-backdrop.open { display: flex; }
+
+    .sheet {
+      width: 100%;
+      max-width: 500px;
+      background: #202024;
+      border-radius: 20px 20px 0 0;
+      padding: 10px 20px calc(24px + env(safe-area-inset-bottom));
+      border-top: 0.5px solid var(--border-strong);
+    }
+
+    .grabber {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: #52525B;
+      margin: 0 auto 14px;
+    }
+
+    .sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .sheet-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .sheet-done {
+      background: none;
+      border: none;
+      color: var(--white);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .ios-group {
+      background: #2A2A30;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .ios-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 0.5px solid var(--border);
+      font-size: 15px;
+    }
+    .ios-row:last-child { border-bottom: none; }
+
+    .ios-row label {
+      color: var(--white);
+      width: 105px;
+      flex-shrink: 0;
+    }
+
+    .ios-row input {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--white);
+      font-size: 15px;
+      text-align: right;
+      outline: none;
+    }
+
+    /* Export & Send Clip Picker Sheet */
+    .send-clip-list {
+      max-height: 220px;
+      overflow-y: auto;
+      background: #2A2A30;
+      border-radius: 12px;
+      margin-bottom: 14px;
+    }
+
+    .send-clip-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+      padding: 10px 14px;
+      border-bottom: 0.5px solid var(--border);
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+    .send-clip-item:last-child { border-bottom: none; }
+
+    .send-clip-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .send-clip-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--white);
+    }
+    .send-clip-sub {
+      font-size: 12px;
+      color: var(--secondary);
+      text-transform: capitalize;
+    }
+
+    .send-check {
+      width: 22px;
+      height: 22px;
+      border-radius: 11px;
+      border: 1.5px solid var(--secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #121214;
+    }
+    .send-check.checked {
+      background: var(--white);
+      border-color: var(--white);
+    }
+
+    .send-actions-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .sheet-action-btn {
+      flex: 1;
+      min-height: 48px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border: 0.5px solid var(--border-strong);
+    }
+    .sheet-action-btn.secondary {
+      background: #2A2A30;
+      color: var(--white);
+    }
+    .sheet-action-btn.primary {
+      background: var(--white);
+      color: #121214;
+      border: none;
+    }
+    .sheet-action-btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+  <input type="file" id="videoInput" accept="video/*" multiple style="display:none" onchange="handleVideosSelected(event)" />
+
+  <div class="app">
+    <!-- Top Functional Toolbar -->
+    <div class="toolbar">
+      <button class="icon-btn" onclick="openSheet()" aria-label="Account Settings">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span class="status-dot" id="ftpDot"></span>
+      </button>
+
+      <div class="timecode-pill" id="timecodePill" style="display:none">10.0s · 30 fps</div>
+
+      <button class="send-btn" id="sendBtn" disabled onclick="openSendSheet()">
+        <span id="sendBtnLabel">Send</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Center Video Stage (Fits Clip Frame Aspect Ratio, Paused by Default + Swipe Navigation) -->
+    <div class="stage" id="videoStage">
+      <div class="empty-prompt" id="emptyPrompt" onclick="document.getElementById('videoInput').click()">
+        <div class="plus-ring">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </div>
+        <div class="empty-title">Select Clips</div>
+        <div class="empty-sub">Auto-detects true FPS & color space. Batch grade in Rec.709 and send lossless CFR to BlackBox.</div>
+      </div>
+
+      <div class="video-frame" id="videoFrame">
+        <video id="videoPreview" playsinline preload="metadata" onclick="togglePlayPause()"></video>
+
+        <!-- Glanceable Automated Metadata Badge -->
+        <div class="meta-badge" id="metaBadge">4K · 59.94 fps · Rec.709</div>
+
+        <!-- Deliberate Play/Pause Button (44x44pt, Paused by Default) -->
+        <button class="play-toggle-btn" id="playToggleBtn" onclick="togglePlayPause()" aria-label="Play or Pause Preview">
+          <svg id="playIconSvg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="6 4 20 12 6 20 6 4"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Precision Controls -->
+    <div class="editor-deck" id="editorDeck">
+      <!-- Swipe-Based Batch Carousel (Long-press to remove clip) -->
+      <div class="batch-strip-row">
+        <div class="batch-scroll" id="batchScroll"></div>
+      </div>
+
+      <!-- 1. Trim Scrubber + Movable Thin Playhead + Split + Sync (in place of bin) -->
+      <div class="trim-row">
+        <button class="mini-btn muted" id="muteBtn" onclick="toggleMute()" aria-label="Toggle Audio">
+          <svg id="muteIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+          </svg>
+        </button>
+
+        <div class="trim-box" id="trimBox">
+          <div class="trim-fill" id="trimFill"></div>
+          <div class="trim-handle start" id="handleStart"></div>
+          <div class="trim-handle end" id="handleEnd"></div>
+          <div class="playhead-line" id="playheadLine"></div>
+        </div>
+
+        <button class="mini-btn" onclick="splitCurrentClip()" aria-label="Split Clip into Two" title="Split clip at playhead">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="6" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+            <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+            <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+          </svg>
+        </button>
+
+        <button class="sync-inline-btn" id="syncBatchBtn" onclick="applyGradeToAll()" title="Sync color look to all clips">
+          Sync
+        </button>
+      </div>
+
+      <!-- 2. Curated Stock Presets OR Single Active Dial -->
+      <div class="active-dial">
+        <div class="preset-strip" id="presetStrip">
+          <div class="preset-card active" id="preset-natural" onclick="applyPreset('natural')">
+            <div class="preset-title">Natural Stock</div>
+            <div class="preset-sub">Rec.709 neutral balance</div>
+          </div>
+          <div class="preset-card" id="preset-commercial" onclick="applyPreset('commercial')">
+            <div class="preset-title">Commercial Punch</div>
+            <div class="preset-sub">+10% contrast · +15% color</div>
+          </div>
+          <div class="preset-card" id="preset-golden" onclick="applyPreset('golden')">
+            <div class="preset-title">Golden Warmth</div>
+            <div class="preset-sub">Warm light · lifted shadows</div>
+          </div>
+          <div class="preset-card" id="preset-cinema" onclick="applyPreset('cinema')">
+            <div class="preset-title">Moody Cinema</div>
+            <div class="preset-sub">-10% sat · deep blacks</div>
+          </div>
+        </div>
+
+        <div id="dialContainer" style="display:none">
+          <div class="dial-header">
+            <span class="dial-name" id="dialName">Light</span>
+            <span class="dial-val" id="dialVal" onclick="resetActiveParam()" title="Tap to reset">0</span>
+          </div>
+          <input type="range" class="apple-slider" id="mainSlider" min="-0.35" max="0.35" step="0.01" value="0" oninput="onDialInput()" />
+        </div>
+      </div>
+
+      <!-- 3. Mode & Parameter Selector Strip -->
+      <div class="param-strip">
+        <button class="param-pill active" id="pill-preset" onclick="selectMode('preset')">Presets</button>
+        <button class="param-pill" id="pill-exposure" onclick="selectMode('exposure')">Light</button>
+        <button class="param-pill" id="pill-temperature" onclick="selectMode('temperature')">Warmth</button>
+        <button class="param-pill" id="pill-contrast" onclick="selectMode('contrast')">Contrast</button>
+        <button class="param-pill" id="pill-saturation" onclick="selectMode('saturation')">Color</button>
+        <button class="param-pill" id="pill-sharpness" onclick="selectMode('sharpness')">Detail</button>
+        <button class="param-pill" id="pill-speedPct" onclick="selectMode('speedPct')">Speed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Undo Snackbar Banner -->
+  <div class="undo-banner" id="undoBanner">
+    <span id="undoText">Removed clip</span>
+    <button class="undo-btn" onclick="undoDeleteClip()">Undo</button>
+  </div>
+
+  <!-- Minimal Floating Upload Toast -->
+  <div class="toast" id="toast">
+    <span id="toastMsg">Encoding…</span>
+    <span id="toastPct" style="color:var(--white); font-variant-numeric:tabular-nums;">0%</span>
+  </div>
+
+  <!-- Apple HIG Action Sheet for Safe Clip Options -->
+  <div class="action-backdrop" id="actionBackdrop" onclick="if(event.target===this) closeActionSheet()">
+    <div class="action-sheet">
+      <div class="action-group">
+        <div class="action-title" id="actionSheetTitle">Clip Options</div>
+        <button class="action-row destructive" onclick="confirmDeleteClip()">Remove Clip from Queue</button>
+        <button class="action-row" onclick="confirmResetClip()">Reset Clip Adjustments</button>
+        <button class="action-row" id="actionSyncRow" onclick="closeActionSheet(); applyGradeToAll();">Apply Grade to All Clips</button>
+      </div>
+      <button class="action-cancel" onclick="closeActionSheet()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Settings Half-Sheet -->
+  <div class="sheet-backdrop" id="sheetBackdrop" onclick="if(event.target===this) closeSheet()">
+    <div class="sheet">
+      <div class="grabber"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">BlackBox FTPS</span>
+        <button class="sheet-done" onclick="saveSettings()">Done</button>
+      </div>
+
+      <div class="ios-group">
+        <div class="ios-row">
+          <label>Server</label>
+          <input id="ftpHost" value="portal.blackbox.global" autocapitalize="none" />
+        </div>
+        <div class="ios-row">
+          <label>Username</label>
+          <input id="ftpUser" placeholder="FTP Username" autocapitalize="none" />
+        </div>
+        <div class="ios-row">
+          <label>Password</label>
+          <input id="ftpPass" type="password" placeholder="Required" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export & Send Sheet (Choose Clips + Save to Device OR Send to BlackBox) -->
+  <div class="sheet-backdrop" id="sendSheetBackdrop" onclick="if(event.target===this) closeSendSheet()">
+    <div class="sheet">
+      <div class="grabber"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Choose Clips</span>
+        <button class="sheet-done" onclick="toggleSelectAllClips()" id="selectAllBtn">Select All</button>
+      </div>
+
+      <div class="send-clip-list" id="sendClipList"></div>
+
+      <div class="send-actions-row">
+        <button class="sheet-action-btn secondary" id="exportDeviceBtn" onclick="exportSelectedToDevice()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Save to Device</span>
+        </button>
+
+        <button class="sheet-action-btn primary" id="uploadBlackBoxBtn" onclick="uploadSelectedToBlackBox()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+          <span>Send to BlackBox</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let clips = [];
+    let activeIdx = 0;
+    let activeMode = 'preset';
+    let sheetTargetIdx = null;
+    let deletedUndo = null;
+    let undoTimer = null;
+
+    const STANDARD_FRAMERATES = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60, 119.88, 120, 240];
+
+    const STOCK_PRESETS = {
+      natural:    { exposure: 0.0,   contrast: 1.0,  saturation: 1.0,  temperature: 0.0,   sharpness: 0.15 },
+      commercial: { exposure: 0.01,  contrast: 1.10, saturation: 1.15, temperature: 0.02,  sharpness: 0.45 },
+      golden:     { exposure: 0.04,  contrast: 1.05, saturation: 1.12, temperature: 0.30,  sharpness: 0.20 },
+      cinema:     { exposure: -0.03, contrast: 1.14, saturation: 0.90, temperature: -0.18, sharpness: 0.25 }
+    };
+
+    const PARAM_CONFIG = {
+      exposure:    { label: 'Light',    min: -0.35, max: 0.35, step: 0.01, def: 0,    fmt: v => (v > 0 ? '+' : '') + Math.round(v * 100) },
+      temperature: { label: 'Warmth',   min: -0.8,  max: 0.8,  step: 0.02, def: 0,    fmt: v => (v > 0 ? '+' : '') + Math.round(v * 100) },
+      contrast:    { label: 'Contrast', min: 0.65,  max: 1.45, step: 0.01, def: 1.0,  fmt: v => (v >= 1 ? '+' : '') + Math.round((v - 1) * 100) + '%' },
+      saturation:  { label: 'Color',    min: 0.0,   max: 1.7,  step: 0.02, def: 1.0,  fmt: v => (v >= 1 ? '+' : '') + Math.round((v - 1) * 100) + '%' },
+      sharpness:   { label: 'Detail',   min: 0.0,   max: 1.5,  step: 0.05, def: 0.15, fmt: v => Math.round(v * 100) + '%' },
+      speedPct:    { label: 'Speed',    min: 20,    max: 100,  step: 1,    def: 100,  fmt: (v, c) => formatSpeedFps(v, c) }
+    };
+
+    // Always clip down to the nearest smaller (or equal) standard FPS convention so slowed clips never duplicate frames
+    function pickTargetCfr(actualFps, sourceFps) {
+      const isNtsc = sourceFps && (
+        Math.abs(sourceFps - 23.976) < 0.05 ||
+        Math.abs(sourceFps - 29.97) < 0.05 ||
+        Math.abs(sourceFps - 59.94) < 0.08 ||
+        Math.abs(sourceFps - 119.88) < 0.15
+      );
+      if (actualFps >= 59.98) return isNtsc ? 59.94 : 60;
+      if (actualFps >= 59.90) return 59.94;
+      if (actualFps >= 50.0) return 50;
+      if (actualFps >= 29.98) return isNtsc ? 29.97 : 30;
+      if (isNtsc && actualFps >= 29.94) return 29.97;
+      if (actualFps >= 25.0) return 25;
+      return isNtsc ? 23.976 : 24;
+    }
+
+    function formatSpeedFps(speedPct, clip) {
+      const srcFps = clip ? clip.sourceFps : 60;
+      const actualFps = Number(((srcFps * speedPct) / 100).toFixed(2));
+      const cfrTarget = pickTargetCfr(actualFps, srcFps);
+      if (actualFps < 23.5) {
+        return `${speedPct}% → ${actualFps} fps (<24 min)`;
+      }
+      return `${speedPct}% → ${actualFps} fps (${cfrTarget} CFR)`;
+    }
+
+    // Automated ISO-BMFF (MP4 / QuickTime MOV) Metadata Extractor: True FPS + NCLX Color Profile
+    async function extractNativeMovMetadata(file) {
+      let fps = 60;
+      let colorTransfer = 'bt709';
+      let colorLabel = 'Rec.709';
+      let isHdrOrLog = false;
+
+      try {
+        const chunkSize = Math.min(file.size, 1536 * 1024);
+        const slices = [await file.slice(0, chunkSize).arrayBuffer()];
+        if (file.size > chunkSize) {
+          slices.push(await file.slice(file.size - chunkSize, file.size).arrayBuffer());
+        }
+        const timescales = [];
+
+        for (const buf of slices) {
+          const dv = new DataView(buf);
+          const len = buf.byteLength;
+          for (let i = 0; i < len - 32; i++) {
+            const b0 = dv.getUint8(i);
+            const b1 = dv.getUint8(i + 1);
+            const b2 = dv.getUint8(i + 2);
+            const b3 = dv.getUint8(i + 3);
+
+            // 'mdhd' media header timescale
+            if (b0 === 0x6d && b1 === 0x64 && b2 === 0x68 && b3 === 0x64) {
+              const ver = dv.getUint8(i + 4);
+              const tsOff = ver === 1 ? i + 24 : i + 16;
+              if (tsOff + 4 <= len) {
+                const ts = dv.getUint32(tsOff);
+                if (ts >= 24 && ts <= 1000000) timescales.push(ts);
+              }
+            }
+
+            // 'colr' NCLX color transfer atom
+            if (b0 === 0x63 && b1 === 0x6f && b2 === 0x6c && b3 === 0x72) {
+              if (
+                i + 15 <= len &&
+                dv.getUint8(i + 4) === 0x6e &&
+                dv.getUint8(i + 5) === 0x63 &&
+                dv.getUint8(i + 6) === 0x6c &&
+                dv.getUint8(i + 7) === 0x78
+              ) {
+                const primaries = dv.getUint16(i + 8);
+                const trc = dv.getUint16(i + 10);
+                if (trc === 18) {
+                  colorTransfer = 'arib-std-b67';
+                  colorLabel = 'HDR HLG';
+                  isHdrOrLog = true;
+                } else if (trc === 16) {
+                  colorTransfer = 'smpte2084';
+                  colorLabel = 'HDR10 PQ';
+                  isHdrOrLog = true;
+                } else if (primaries === 9 || trc === 14 || trc === 15) {
+                  colorTransfer = 'bt2020';
+                  colorLabel = 'Rec.2020';
+                  isHdrOrLog = true;
+                }
+              }
+            }
+
+            // 'stts' time-to-sample table
+            if (b0 === 0x73 && b1 === 0x74 && b2 === 0x74 && b3 === 0x73) {
+              const entryCount = dv.getUint32(i + 8);
+              if (entryCount >= 1 && entryCount < 500000 && i + 20 <= len) {
+                const sampleCount = dv.getUint32(i + 12);
+                const sampleDelta = dv.getUint32(i + 16);
+                if (sampleCount >= 5 && sampleDelta > 0 && sampleDelta <= 5000) {
+                  const candidates = [...timescales, 600, 60000, 90000, 30000, 24000, 25000];
+                  for (const ts of candidates) {
+                    const guess = ts / sampleDelta;
+                    let closest = null;
+                    let minDiff = 0.12;
+                    for (const std of STANDARD_FRAMERATES) {
+                      const diff = Math.abs(guess - std);
+                      if (diff < minDiff) {
+                        minDiff = diff;
+                        closest = std;
+                      }
+                    }
+                    if (closest !== null) {
+                      fps = closest;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {}
+      return { fps, colorTransfer, colorLabel, isHdrOrLog };
+    }
+
+    function initSettings() {
+      const saved = JSON.parse(localStorage.getItem('bb_ftp') || '{}');
+      if (saved.host) document.getElementById('ftpHost').value = saved.host;
+      if (saved.username) document.getElementById('ftpUser').value = saved.username;
+      if (saved.password) document.getElementById('ftpPass').value = saved.password;
+      document.getElementById('ftpDot').classList.toggle('connected', !!(saved.username && saved.password));
+    }
+    initSettings();
+
+    function openSheet() { document.getElementById('sheetBackdrop').classList.add('open'); }
+    function closeSheet() { document.getElementById('sheetBackdrop').classList.remove('open'); }
+
+    function saveSettings() {
+      const cfg = {
+        host: document.getElementById('ftpHost').value.trim() || 'portal.blackbox.global',
+        port: 21,
+        username: document.getElementById('ftpUser').value.trim(),
+        password: document.getElementById('ftpPass').value,
+        secure: true,
+        remoteDir: '/'
+      };
+      localStorage.setItem('bb_ftp', JSON.stringify(cfg));
+      initSettings();
+      closeSheet();
+    }
+
+    // Horizontal swipe navigation on video stage
+    let touchStartX = null;
+    const stageEl = document.getElementById('videoStage');
+    stageEl.addEventListener('touchstart', e => {
+      if (e.touches.length === 1) touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+    stageEl.addEventListener('touchend', e => {
+      if (touchStartX === null || clips.length < 2) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      touchStartX = null;
+      if (dx < -60 && activeIdx < clips.length - 1) selectClip(activeIdx + 1);
+      else if (dx > 60 && activeIdx > 0) selectClip(activeIdx - 1);
+    }, { passive: true });
+
+    async function handleVideosSelected(e) {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+
+      for (const file of files) {
+        const meta = await extractNativeMovMetadata(file);
+        const url = URL.createObjectURL(file);
+        const videoDims = await new Promise(resolve => {
+          const tempVid = document.createElement('video');
+          tempVid.preload = 'metadata';
+          tempVid.onloadedmetadata = () => resolve({
+            duration: Math.max(1, tempVid.duration || 12),
+            width: tempVid.videoWidth || 3840,
+            height: tempVid.videoHeight || 2160
+          });
+          tempVid.onerror = () => resolve({ duration: 12, width: 3840, height: 2160 });
+          tempVid.src = url;
+        });
+
+        const longEdge = Math.max(videoDims.width, videoDims.height);
+        const resLabel = longEdge >= 3800 ? '4K' : longEdge >= 1900 ? '1080p' : `${videoDims.width}×${videoDims.height}`;
+        const badgeText = `${resLabel} ${meta.fps} fps • ${meta.colorLabel}${meta.isHdrOrLog ? ' → Rec.709' : ''}`;
+
+        clips.push({
+          id: 'clip_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          file,
+          url,
+          name: file.name,
+          sourceDuration: videoDims.duration,
+          width: videoDims.width,
+          height: videoDims.height,
+          sourceFps: meta.fps,
+          metadata: {
+            fps: meta.fps,
+            width: videoDims.width,
+            height: videoDims.height,
+            colorTransfer: meta.colorTransfer,
+            isHdrOrLog: meta.isHdrOrLog,
+            badgeText
+          },
+          status: 'ready',
+          edits: {
+            preset: 'natural',
+            trimStart: 0,
+            trimEnd: Math.min(videoDims.duration, 59),
+            exposure: 0,
+            temperature: 0,
+            contrast: 1.0,
+            saturation: 1.0,
+            sharpness: 0.15,
+            normalizeToRec709: true,
+            speedPct: 100,
+            stripAudio: true
+          }
+        });
+      }
+
+      e.target.value = '';
+      document.getElementById('emptyPrompt').style.display = 'none';
+      document.getElementById('editorDeck').style.display = 'flex';
+      document.getElementById('timecodePill').style.display = 'block';
+      document.getElementById('videoFrame').style.display = 'flex';
+
+      selectClip(clips.length - files.length);
+    }
+
+    // Requirement 1: Keep video paused by default at trimStart & fit frame aspect ratio
+    function selectClip(idx) {
+      if (idx < 0 || idx >= clips.length) return;
+      activeIdx = idx;
+      const c = clips[activeIdx];
+      const frame = document.getElementById('videoFrame');
+      const video = document.getElementById('videoPreview');
+
+      // Fit frame container directly to the clip's aspect ratio (no extra grey box area)
+      const w = c.width || 1920;
+      const h = c.height || 1080;
+      frame.style.aspectRatio = `${w} / ${h}`;
+      if (w >= h) {
+        frame.style.width = '100%';
+        frame.style.height = 'auto';
+        frame.style.maxHeight = '100%';
+        frame.style.maxWidth = '100%';
+      } else {
+        frame.style.height = '100%';
+        frame.style.width = 'auto';
+        frame.style.maxWidth = '100%';
+        frame.style.maxHeight = '100%';
+      }
+
+      video.pause();
+      if (video.src !== c.url) {
+        video.src = c.url;
+      }
+      video.muted = c.edits.stripAudio;
+      video.playbackRate = c.edits.speedPct / 100;
+      if (
+        typeof c.playhead !== 'number' ||
+        c.playhead < c.edits.trimStart ||
+        c.playhead > c.edits.trimEnd
+      ) {
+        c.playhead = c.edits.trimStart;
+      }
+      video.currentTime = c.playhead;
+      updatePlayIcon(false);
+
+      video.ontimeupdate = () => {
+        const cur = clips[activeIdx];
+        if (!cur || video.paused) return;
+        cur.playhead = video.currentTime;
+        updateTrimAndPlayheadUI(cur);
+        if (video.currentTime >= cur.edits.trimEnd) {
+          video.pause();
+          cur.playhead = cur.edits.trimStart;
+          video.currentTime = cur.edits.trimStart;
+          updateTrimAndPlayheadUI(cur);
+          updatePlayIcon(false);
+        }
+      };
+
+      selectMode(activeMode);
+      refreshUI();
+    }
+
+    function updateTrimAndPlayheadUI(c) {
+      if (!c) return;
+      const dur = Math.max(c.sourceDuration, 0.1);
+      const startPct = (c.edits.trimStart / dur) * 100;
+      const endPct = (c.edits.trimEnd / dur) * 100;
+      const pos = Math.max(
+        c.edits.trimStart,
+        Math.min(c.edits.trimEnd, c.playhead ?? c.edits.trimStart)
+      );
+      const playPct = (pos / dur) * 100;
+
+      const fill = document.getElementById('trimFill');
+      fill.style.left = startPct + '%';
+      fill.style.width = Math.max(0, endPct - startPct) + '%';
+
+      document.getElementById('handleStart').style.left = startPct + '%';
+      document.getElementById('handleEnd').style.left = endPct + '%';
+      document.getElementById('playheadLine').style.left = playPct + '%';
+    }
+
+    // Direct touch & pointer gesture handler for #trimBox (Start Handle, End Handle, and Independent Playhead)
+    (function initTrimBoxGestures() {
+      const box = document.getElementById('trimBox');
+      let dragMode = null; // 'playhead' | 'start' | 'end'
+
+      function pickDragMode(clientX) {
+        const c = clips[activeIdx];
+        if (!c) return null;
+        const rect = box.getBoundingClientRect();
+        if (rect.width <= 0) return null;
+        const dur = Math.max(c.sourceDuration, 0.1);
+        const startX = rect.left + (c.edits.trimStart / dur) * rect.width;
+        const endX = rect.left + (c.edits.trimEnd / dur) * rect.width;
+        const playX =
+          rect.left +
+          ((c.playhead ?? c.edits.trimStart) / dur) * rect.width;
+
+        const dStart = Math.abs(clientX - startX);
+        const dEnd = Math.abs(clientX - endX);
+        const dPlay = Math.abs(clientX - playX);
+
+        // If user grabs the playhead directly (and it's not behind a handle they're closer to when parked at start)
+        if (dPlay <= 16 && c.playhead > c.edits.trimStart + 0.15 && c.playhead < c.edits.trimEnd - 0.15) {
+          return 'playhead';
+        }
+        if (dStart <= 18 && dStart <= dEnd) {
+          return 'start';
+        }
+        if (dEnd <= 18) {
+          return 'end';
+        }
+        return 'playhead';
+      }
+
+      function applyDragAt(clientX) {
+        const c = clips[activeIdx];
+        if (!c || !dragMode) return;
+        const rect = box.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const t = Number((ratio * c.sourceDuration).toFixed(2));
+
+        if (dragMode === 'start') {
+          const nextStart = Math.max(0, Math.min(c.edits.trimEnd - 0.5, t));
+          c.edits.trimStart = Number(nextStart.toFixed(1));
+          if (c.playhead < c.edits.trimStart) c.playhead = c.edits.trimStart;
+          seekStaticFrame(c.edits.trimStart);
+          refreshUI();
+        } else if (dragMode === 'end') {
+          const nextEnd = Math.min(
+            c.sourceDuration,
+            Math.max(c.edits.trimStart + 0.5, t)
+          );
+          c.edits.trimEnd = Number(nextEnd.toFixed(1));
+          if (c.playhead > c.edits.trimEnd) c.playhead = c.edits.trimEnd;
+          seekStaticFrame(c.edits.trimEnd);
+          refreshUI();
+        } else if (dragMode === 'playhead') {
+          const nextPlay = Math.max(
+            c.edits.trimStart,
+            Math.min(c.edits.trimEnd, t)
+          );
+          c.playhead = nextPlay;
+          seekStaticFrame(nextPlay);
+          updateTrimAndPlayheadUI(c);
+        }
+      }
+
+      box.addEventListener(
+        'touchstart',
+        (e) => {
+          if (!e.touches.length) return;
+          const x = e.touches[0].clientX;
+          dragMode = pickDragMode(x);
+          applyDragAt(x);
+        },
+        { passive: true }
+      );
+
+      box.addEventListener(
+        'touchmove',
+        (e) => {
+          if (!dragMode || !e.touches.length) return;
+          e.preventDefault();
+          applyDragAt(e.touches[0].clientX);
+        },
+        { passive: false }
+      );
+
+      box.addEventListener(
+        'touchend',
+        () => {
+          dragMode = null;
+        },
+        { passive: true }
+      );
+
+      box.addEventListener('mousedown', (e) => {
+        dragMode = pickDragMode(e.clientX);
+        applyDragAt(e.clientX);
+        const onMove = (ev) => applyDragAt(ev.clientX);
+        const onUp = () => {
+          dragMode = null;
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+    })();
+
+    function splitCurrentClip() {
+      const c = clips[activeIdx];
+      if (!c) return;
+      const span = c.edits.trimEnd - c.edits.trimStart;
+      if (span < 1.0) return;
+
+      // Split at the movable playhead position if inside the clip; otherwise split at midpoint
+      let splitAt = typeof c.playhead === 'number' ? c.playhead : c.edits.trimStart;
+      if (
+        splitAt <= c.edits.trimStart + 0.25 ||
+        splitAt >= c.edits.trimEnd - 0.25
+      ) {
+        splitAt = Number(((c.edits.trimStart + c.edits.trimEnd) / 2).toFixed(2));
+      } else {
+        splitAt = Number(splitAt.toFixed(2));
+      }
+
+      const originalEnd = c.edits.trimEnd;
+      c.edits.trimEnd = splitAt;
+      c.playhead = c.edits.trimStart;
+
+      const secondClip = {
+        id: 'clip_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        file: c.file,
+        url: c.url,
+        name: c.name,
+        sourceDuration: c.sourceDuration,
+        width: c.width,
+        height: c.height,
+        sourceFps: c.sourceFps,
+        metadata: { ...c.metadata },
+        status: 'ready',
+        selectedForSend: true,
+        playhead: splitAt,
+        edits: {
+          ...c.edits,
+          trimStart: splitAt,
+          trimEnd: originalEnd
+        }
+      };
+
+      clips.splice(activeIdx + 1, 0, secondClip);
+      selectClip(activeIdx + 1);
+    }
+
+    function updatePlayIcon(playing) {
+      document.getElementById('playIconSvg').innerHTML = playing
+        ? '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>'
+        : '<polygon points="6 4 20 12 6 20 6 4"></polygon>';
+    }
+
+    function togglePlayPause() {
+      const v = document.getElementById('videoPreview');
+      const c = clips[activeIdx];
+      if (!c) return;
+      if (v.paused) {
+        if (v.currentTime >= c.edits.trimEnd - 0.1 || v.currentTime < c.edits.trimStart) {
+          v.currentTime = c.edits.trimStart;
+        }
+        v.play().then(() => updatePlayIcon(true)).catch(() => {});
+      } else {
+        v.pause();
+        updatePlayIcon(false);
+      }
+    }
+
+    function seekStaticFrame(sec) {
+      const v = document.getElementById('videoPreview');
+      if (!v.paused) {
+        v.pause();
+        updatePlayIcon(false);
+      }
+      v.currentTime = sec;
+    }
+
+    // Safe HIG Action Sheet for clip options & deletion
+    function openClipActionSheet(idx) {
+      const c = clips[idx];
+      if (!c) return;
+      sheetTargetIdx = idx;
+      document.getElementById('actionSheetTitle').textContent = `${c.name} (${c.metadata.badgeText})`;
+      document.getElementById('actionSyncRow').style.display = clips.length > 1 ? 'block' : 'none';
+      document.getElementById('actionBackdrop').classList.add('open');
+    }
+
+    function closeActionSheet() {
+      document.getElementById('actionBackdrop').classList.remove('open');
+      sheetTargetIdx = null;
+    }
+
+    function confirmDeleteClip() {
+      const idx = sheetTargetIdx;
+      closeActionSheet();
+      if (idx === null || idx < 0 || idx >= clips.length) return;
+
+      const removed = clips.splice(idx, 1)[0];
+      if (undoTimer) clearTimeout(undoTimer);
+      deletedUndo = { clip: removed, index: idx };
+
+      const banner = document.getElementById('undoBanner');
+      document.getElementById('undoText').textContent = `Removed ${removed.name}`;
+      banner.style.display = 'flex';
+      undoTimer = setTimeout(() => {
+        banner.style.display = 'none';
+        deletedUndo = null;
+      }, 5000);
+
+      if (clips.length === 0) {
+        document.getElementById('emptyPrompt').style.display = 'flex';
+        document.getElementById('editorDeck').style.display = 'none';
+        document.getElementById('timecodePill').style.display = 'none';
+        document.getElementById('videoFrame').style.display = 'none';
+        const v = document.getElementById('videoPreview');
+        v.pause();
+        refreshUI();
+        return;
+      }
+      if (activeIdx >= clips.length) activeIdx = clips.length - 1;
+      selectClip(activeIdx);
+    }
+
+    function undoDeleteClip() {
+      if (!deletedUndo) return;
+      if (undoTimer) clearTimeout(undoTimer);
+      document.getElementById('undoBanner').style.display = 'none';
+      const { clip: restored, index } = deletedUndo;
+      deletedUndo = null;
+
+      const insertAt = Math.min(index, clips.length);
+      clips.splice(insertAt, 0, restored);
+
+      document.getElementById('emptyPrompt').style.display = 'none';
+      document.getElementById('editorDeck').style.display = 'flex';
+      document.getElementById('timecodePill').style.display = 'block';
+      document.getElementById('videoFrame').style.display = 'flex';
+
+      selectClip(insertAt);
+    }
+
+    function confirmResetClip() {
+      const idx = sheetTargetIdx;
+      closeActionSheet();
+      if (idx === null || !clips[idx]) return;
+      const c = clips[idx];
+      c.edits = {
+        preset: 'natural',
+        trimStart: 0,
+        trimEnd: Math.min(c.sourceDuration, 59),
+        exposure: 0,
+        temperature: 0,
+        contrast: 1.0,
+        saturation: 1.0,
+        sharpness: 0.15,
+        normalizeToRec709: true,
+        speedPct: 100,
+        stripAudio: true
+      };
+      selectClip(idx);
+    }
+
+    function applyPreset(presetId) {
+      const c = clips[activeIdx];
+      if (!c || !STOCK_PRESETS[presetId]) return;
+      Object.assign(c.edits, STOCK_PRESETS[presetId], { preset: presetId });
+      refreshUI();
+    }
+
+    function applyGradeToAll() {
+      const cur = clips[activeIdx];
+      if (!cur || clips.length < 2) return;
+      clips.forEach((c, i) => {
+        if (i === activeIdx) return;
+        c.edits.preset = cur.edits.preset;
+        c.edits.exposure = cur.edits.exposure;
+        c.edits.temperature = cur.edits.temperature;
+        c.edits.contrast = cur.edits.contrast;
+        c.edits.saturation = cur.edits.saturation;
+        c.edits.sharpness = cur.edits.sharpness;
+        c.edits.normalizeToRec709 = cur.edits.normalizeToRec709;
+      });
+      refreshUI();
+    }
+
+    function toggleMute() {
+      const c = clips[activeIdx];
+      if (!c) return;
+      c.edits.stripAudio = !c.edits.stripAudio;
+      document.getElementById('videoPreview').muted = c.edits.stripAudio;
+      refreshUI();
+    }
+
+    function selectMode(mode) {
+      activeMode = mode;
+      ['preset', 'exposure', 'temperature', 'contrast', 'saturation', 'sharpness', 'speedPct'].forEach(m => {
+        document.getElementById('pill-' + m).classList.toggle('active', m === mode);
+      });
+
+      if (mode === 'preset') {
+        document.getElementById('presetStrip').style.display = 'flex';
+        document.getElementById('dialContainer').style.display = 'none';
+      } else {
+        document.getElementById('presetStrip').style.display = 'none';
+        document.getElementById('dialContainer').style.display = 'block';
+        const c = clips[activeIdx];
+        const cfg = PARAM_CONFIG[mode];
+        const slider = document.getElementById('mainSlider');
+        slider.min = cfg.min;
+        slider.max = cfg.max;
+        slider.step = cfg.step;
+        slider.value = c ? c.edits[mode] : cfg.def;
+        document.getElementById('dialName').textContent = cfg.label;
+      }
+      refreshUI();
+    }
+
+    function onDialInput() {
+      const c = clips[activeIdx];
+      if (!c || activeMode === 'preset') return;
+      let val = parseFloat(document.getElementById('mainSlider').value);
+
+      if (activeMode === 'speedPct') {
+        for (const snap of [25, 40, 50, 80, 100]) {
+          if (Math.abs(val - snap) <= 1) {
+            val = snap;
+            document.getElementById('mainSlider').value = snap;
+            break;
+          }
+        }
+        document.getElementById('videoPreview').playbackRate = val / 100;
+      } else {
+        c.edits.preset = 'custom';
+      }
+
+      c.edits[activeMode] = val;
+      refreshUI();
+    }
+
+    function resetActiveParam() {
+      const c = clips[activeIdx];
+      if (!c || activeMode === 'preset') return;
+      const cfg = PARAM_CONFIG[activeMode];
+      c.edits[activeMode] = cfg.def;
+      document.getElementById('mainSlider').value = cfg.def;
+      if (activeMode === 'speedPct') {
+        document.getElementById('videoPreview').playbackRate = 1.0;
+      }
+      refreshUI();
+    }
+
+    function isClipCompliant(c) {
+      const speedMult = c.edits.speedPct / 100;
+      const outDur = (c.edits.trimEnd - c.edits.trimStart) / speedMult;
+      const actualFps = (c.sourceFps * c.edits.speedPct) / 100;
+      return outDur >= 5.0 && outDur <= 59.0 && actualFps >= 23.5;
+    }
+
+    function refreshUI() {
+      const c = clips[activeIdx];
+      if (!c) {
+        document.getElementById('sendBtn').disabled = true;
+        document.getElementById('sendBtnLabel').textContent = 'Send';
+        return;
+      }
+
+      // Metadata badge
+      document.getElementById('metaBadge').textContent = c.metadata.badgeText;
+
+      // Preset highlight
+      ['natural', 'commercial', 'golden', 'cinema'].forEach(id => {
+        document.getElementById('preset-' + id).classList.toggle('active', c.edits.preset === id);
+      });
+
+      // Mute icon
+      const muteBtn = document.getElementById('muteBtn');
+      muteBtn.classList.toggle('muted', c.edits.stripAudio);
+      document.getElementById('muteIcon').innerHTML = c.edits.stripAudio
+        ? '<path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>'
+        : '<path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>';
+
+      // Trim fill, handles & playhead
+      updateTrimAndPlayheadUI(c);
+
+      // Active dial readout
+      const actualFps = Number(((c.sourceFps * c.edits.speedPct) / 100).toFixed(2));
+      if (activeMode !== 'preset') {
+        const cfg = PARAM_CONFIG[activeMode];
+        const valEl = document.getElementById('dialVal');
+        valEl.textContent = cfg.fmt(c.edits[activeMode], c);
+        valEl.classList.toggle('warn', activeMode === 'speedPct' && actualFps < 23.5);
+      }
+
+      // Live CSS filter preview
+      const b = 1 + c.edits.exposure;
+      const sepia = c.edits.temperature > 0 ? c.edits.temperature * 0.25 : 0;
+      const hue = c.edits.temperature < 0 ? c.edits.temperature * 20 : 0;
+      document.getElementById('videoPreview').style.filter =
+        `brightness(${b}) contrast(${c.edits.contrast}) saturate(${c.edits.saturation}) sepia(${sepia}) hue-rotate(${hue}deg)`;
+
+      // Modified indicator dots
+      document.getElementById('pill-preset').classList.toggle('modified', c.edits.preset !== 'natural');
+      Object.keys(PARAM_CONFIG).forEach(k => {
+        const isMod = Math.abs(c.edits[k] - PARAM_CONFIG[k].def) > 0.015;
+        document.getElementById('pill-' + k).classList.toggle('modified', isMod);
+      });
+
+      // Timecode & CFR Compliance Pill
+      const speedMult = c.edits.speedPct / 100;
+      const outDur = (c.edits.trimEnd - c.edits.trimStart) / speedMult;
+      const targetCfr = pickTargetCfr(actualFps, c.sourceFps);
+      const durOk = outDur >= 5.0 && outDur <= 59.0;
+      const fpsOk = actualFps >= 23.5;
+      const valid = durOk && fpsOk;
+
+      const pill = document.getElementById('timecodePill');
+      pill.classList.toggle('invalid', !valid);
+      if (!durOk) {
+        pill.textContent = outDur < 5.0 ? `${outDur.toFixed(1)}s · Min 5s` : `${outDur.toFixed(1)}s · Max 59s`;
+      } else if (!fpsOk) {
+        pill.textContent = `${actualFps} fps · Min 24 fps`;
+      } else {
+        pill.textContent = `${outDur.toFixed(1)}s · ${targetCfr} fps`;
+      }
+
+      // Render Batch Carousel (No numbering, no exposed 'X' buttons; long-press opens HIG Action Sheet)
+      const scroll = document.getElementById('batchScroll');
+      scroll.innerHTML = '';
+      clips.forEach((item, idx) => {
+        const card = document.createElement('div');
+        const itemValid = isClipCompliant(item);
+        const itemFps = Number(((item.sourceFps * item.edits.speedPct) / 100).toFixed(2));
+        const itemCfr = pickTargetCfr(itemFps, item.sourceFps);
+        const itemDur = ((item.edits.trimEnd - item.edits.trimStart) / (item.edits.speedPct / 100)).toFixed(1);
+        const checkSvg = item.status === 'done'
+          ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+          : '';
+
+        card.className =
+          'clip-card' +
+          (idx === activeIdx ? ' active' : '') +
+          (item.status === 'done' ? ' done' : !itemValid ? ' invalid' : '');
+        card.innerHTML = `
+          <div class="clip-card-top"><span>${itemDur}s</span>${checkSvg}</div>
+          <div class="clip-card-sub">${itemCfr} fps · ${item.edits.preset}</div>
+        `;
+        card.onclick = () => selectClip(idx);
+
+        // Long-press for safe destructive Action Sheet
+        let pressTimer = null;
+        card.addEventListener('touchstart', () => {
+          pressTimer = setTimeout(() => openClipActionSheet(idx), 380);
+        }, { passive: true });
+        card.addEventListener('touchend', () => clearTimeout(pressTimer), { passive: true });
+        card.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true });
+        card.oncontextmenu = (ev) => {
+          ev.preventDefault();
+          openClipActionSheet(idx);
+        };
+
+        scroll.appendChild(card);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-clip-btn';
+      addBtn.setAttribute('aria-label', 'Add More Clips');
+      addBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>';
+      addBtn.onclick = () => document.getElementById('videoInput').click();
+      scroll.appendChild(addBtn);
+
+      document.getElementById('sendBtn').disabled = clips.length === 0;
+      document.getElementById('sendBtnLabel').textContent = 'Send';
+    }
+
+    // Export & Send Sheet: Choose between clips + Save to Device OR Send to BlackBox
+    function openSendSheet() {
+      if (!clips.length) return;
+      clips.forEach((c) => {
+        if (typeof c.selectedForSend !== 'boolean') {
+          c.selectedForSend = true;
+        }
+      });
+      renderSendClipList();
+      document.getElementById('sendSheetBackdrop').classList.add('open');
+    }
+
+    function closeSendSheet() {
+      document.getElementById('sendSheetBackdrop').classList.remove('open');
+    }
+
+    function toggleSelectAllClips() {
+      const allSelected = clips.every((c) => c.selectedForSend);
+      clips.forEach((c) => {
+        c.selectedForSend = !allSelected;
+      });
+      renderSendClipList();
+    }
+
+    function renderSendClipList() {
+      const list = document.getElementById('sendClipList');
+      list.innerHTML = '';
+
+      clips.forEach((c) => {
+        const itemFps = Number(((c.sourceFps * c.edits.speedPct) / 100).toFixed(2));
+        const itemCfr = pickTargetCfr(itemFps, c.sourceFps);
+        const itemDur = ((c.edits.trimEnd - c.edits.trimStart) / (c.edits.speedPct / 100)).toFixed(1);
+
+        const row = document.createElement('div');
+        row.className = 'send-clip-item';
+        row.innerHTML = `
+          <div class="send-clip-info">
+            <div class="send-clip-title">${itemDur}s · ${itemCfr} fps</div>
+            <div class="send-clip-sub">${c.edits.preset} · ${c.edits.speedPct}% speed</div>
+          </div>
+          <div class="send-check ${c.selectedForSend ? 'checked' : ''}">
+            ${c.selectedForSend ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          </div>
+        `;
+        row.onclick = () => {
+          c.selectedForSend = !c.selectedForSend;
+          renderSendClipList();
+        };
+        list.appendChild(row);
+      });
+
+      const selectedCount = clips.filter((c) => c.selectedForSend).length;
+      const allSelected = selectedCount === clips.length;
+      document.getElementById('selectAllBtn').textContent = allSelected ? 'Deselect All' : 'Select All';
+      document.getElementById('exportDeviceBtn').disabled = selectedCount === 0;
+      document.getElementById('uploadBlackBoxBtn').disabled = selectedCount === 0;
+    }
+
+    async function exportSelectedToDevice() {
+      const queue = clips.filter((c) => c.selectedForSend);
+      if (!queue.length) return;
+      closeSendSheet();
+
+      const v = document.getElementById('videoPreview');
+      v.pause();
+      updatePlayIcon(false);
+
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastPct = document.getElementById('toastPct');
+      const sendBtn = document.getElementById('sendBtn');
+
+      toast.style.display = 'flex';
+      toastMsg.style.color = '#F4F4F6';
+      sendBtn.disabled = true;
+
+      const exportedFiles = [];
+
+      for (let i = 0; i < queue.length; i++) {
+        const item = queue[i];
+        const jobId = 'export_' + Date.now() + '_' + i;
+
+        let polling = true;
+        const poll = setInterval(async () => {
+          if (!polling) return;
+          try {
+            const r = await fetch('/api/job/' + jobId);
+            const j = await r.json();
+            if (j && j.message) {
+              toastMsg.textContent = j.message;
+              toastPct.textContent = Math.round((j.progress || 0.1) * 100) + '%';
+            }
+          } catch {}
+        }, 600);
+
+        try {
+          const actualFps = (item.sourceFps * item.edits.speedPct) / 100;
+          const targetFps = pickTargetCfr(actualFps, item.sourceFps);
+          const payloadEdits = {
+            ...item.edits,
+            speed: Number((item.edits.speedPct / 100).toFixed(3)),
+            targetFps,
+            resolution: 'source'
+          };
+
+          const fd = new FormData();
+          fd.append('jobId', jobId);
+          fd.append('originalName', item.name);
+          fd.append('edits', JSON.stringify(payloadEdits));
+          fd.append('metadata', JSON.stringify(item.metadata || {}));
+          fd.append('video', item.file);
+
+          const res = await fetch('/api/process-only', { method: 'POST', body: fd });
+          const data = await res.json();
+          polling = false;
+          clearInterval(poll);
+
+          if (!data.ok) {
+            throw new Error(data.error || 'Export failed');
+          }
+
+          toastMsg.textContent = 'Preparing video for device…';
+          const fileRes = await fetch(data.downloadUrl);
+          const blob = await fileRes.blob();
+          const fileObj = new File([blob], data.fileName, { type: 'video/mp4' });
+          exportedFiles.push({ fileObj, url: data.downloadUrl, name: data.fileName });
+        } catch (err) {
+          polling = false;
+          clearInterval(poll);
+          toastPct.textContent = '';
+          toastMsg.style.color = '#F87171';
+          toastMsg.textContent = err.message;
+          sendBtn.disabled = false;
+          return;
+        }
+      }
+
+      // Use iOS native Share / "Save Video" sheet if supported, with download fallback
+      try {
+        const filesToShare = exportedFiles.map((e) => e.fileObj);
+        if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
+          await navigator.share({
+            files: filesToShare,
+            title: 'Save to Device'
+          });
+        } else {
+          for (const exp of exportedFiles) {
+            const a = document.createElement('a');
+            a.href = exp.url;
+            a.download = exp.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
+        }
+      } catch {
+        for (const exp of exportedFiles) {
+          const a = document.createElement('a');
+          a.href = exp.url;
+          a.download = exp.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      }
+
+      toastPct.textContent = 'Saved';
+      toastMsg.textContent = `Exported ${exportedFiles.length} clip${exportedFiles.length > 1 ? 's' : ''}`;
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+      sendBtn.disabled = false;
+    }
+
+    async function uploadSelectedToBlackBox() {
+      const ftpConfig = JSON.parse(localStorage.getItem('bb_ftp') || '{}');
+      if (!ftpConfig.username || !ftpConfig.password) {
+        closeSendSheet();
+        openSheet();
+        return;
+      }
+
+      const queue = clips.filter((c) => c.selectedForSend);
+      if (!queue.length) return;
+      closeSendSheet();
+
+      const v = document.getElementById('videoPreview');
+      v.pause();
+      updatePlayIcon(false);
+
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastPct = document.getElementById('toastPct');
+      const sendBtn = document.getElementById('sendBtn');
+
+      toast.style.display = 'flex';
+      toastMsg.style.color = '#F4F4F6';
+      sendBtn.disabled = true;
+
+      for (let i = 0; i < queue.length; i++) {
+        const item = queue[i];
+        const jobId = 'job_' + Date.now() + '_' + i;
+        const prefix = queue.length > 1 ? `[${i + 1}/${queue.length}] ` : '';
+
+        let polling = true;
+        const poll = setInterval(async () => {
+          if (!polling) return;
+          try {
+            const r = await fetch('/api/job/' + jobId);
+            const j = await r.json();
+            if (j && j.message) {
+              toastMsg.textContent = prefix + j.message;
+              toastPct.textContent = Math.round((j.progress || 0.1) * 100) + '%';
+            }
+          } catch {}
+        }, 600);
+
+        try {
+          const actualFps = (item.sourceFps * item.edits.speedPct) / 100;
+          const targetFps = pickTargetCfr(actualFps, item.sourceFps);
+          const payloadEdits = {
+            ...item.edits,
+            speed: Number((item.edits.speedPct / 100).toFixed(3)),
+            targetFps,
+            resolution: 'source'
+          };
+
+          const fd = new FormData();
+          fd.append('jobId', jobId);
+          fd.append('originalName', item.name);
+          fd.append('edits', JSON.stringify(payloadEdits));
+          fd.append('metadata', JSON.stringify(item.metadata || {}));
+          fd.append('ftpConfig', JSON.stringify(ftpConfig));
+          fd.append('video', item.file);
+
+          const res = await fetch('/api/process-and-upload', { method: 'POST', body: fd });
+          const data = await res.json();
+          polling = false;
+          clearInterval(poll);
+
+          if (!data.ok) {
+            throw new Error(data.error || 'Upload failed');
+          }
+          item.status = 'done';
+          refreshUI();
+        } catch (err) {
+          polling = false;
+          clearInterval(poll);
+          toastPct.textContent = '';
+          toastMsg.style.color = '#F87171';
+          toastMsg.textContent = `${prefix}${err.message}`;
+          sendBtn.disabled = false;
+          return;
+        }
+      }
+
+      toastPct.textContent = 'Done';
+      toastMsg.textContent = `Uploaded ${queue.length} clip${queue.length > 1 ? 's' : ''} to BlackBox`;
+      setTimeout(() => { toast.style.display = 'none'; }, 3500);
+      sendBtn.disabled = false;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "BB Direct Studio",
+    "slug": "blackbox-editor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#090A0F"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.blackbox.directstudio",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Select footage from your Camera Roll to edit, convert to Constant Frame Rate, and upload directly to BlackBox Global.",
+        "NSPhotoLibraryAddUsageDescription": "Save Constant Frame Rate (CFR) edited clips back to your Camera Roll.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow BB Direct Studio to access your videos for editing and BlackBox FTP uploading."
+        }
+      ],
+      "expo-secure-store",
+      "expo-video"
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+name: Build Unsigned iOS IPA (For Free Sideloading via SideStore / AltStore)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios-ipa:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prebuild Native iOS Xcode Project
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Compile Unsigned Release .app via Xcodebuild
+        run: |
+          cd ios
+          WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package into Sideloadable .ipa
+        run: |
+          mkdir -p Payload
+          APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
+          cp -r "$APP_PATH" Payload/
+          zip -r BB-Direct-Studio-unsigned.ipa Payload
+
+      - name: Upload .ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BB-Direct-Studio-iOS-IPA
+          path: BB-Direct-Studio-unsigned.ipa
